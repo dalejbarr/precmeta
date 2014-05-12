@@ -57,6 +57,8 @@ ssrb.mx <- ssrb.mx[c(4,8,5:7,9,1:3,10),]
 save(ssrb.mx, cols, file="ssrb.mx.RData")
 
 # different speaker novelty benefit
+bpnames <- setdiff(ff, c("barr08.3", "barrkeysar02.2", "hortonslaten11"))
+
 metzingbrennan03.dsnb <-
   metzingbrennan03["Diff-Break",]-metzingbrennan03["Same-Break",]
 
