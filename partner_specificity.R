@@ -23,11 +23,11 @@ metzingbrennan03.exp <- calcPE(metzingbrennan03["Same-Maintain",], metzingbrenna
 kronmullerbarr07.1.exp <- calcPE(kronmullerbarr07.1["Same-Maint",], kronmullerbarr07.1["Same-Break",],
                                  kronmullerbarr07.1["Diff-Maint",], kronmullerbarr07.1["Diff-Break",])
   
-kronmullerbarr07.2.nl.exp <- calcPE(kronmullerbarr07.2.nl["S-M",], kronmullerbarr07.2.nl["S-B",],
-                                    kronmullerbarr07.2.nl["D-M",], kronmullerbarr07.2.nl["D-B",])
+kronmullerbarr07.2.nl.exp <- calcPE(kronmullerbarr07.2.nl["Same-Maint",], kronmullerbarr07.2.nl["Same-Break",],
+                                    kronmullerbarr07.2.nl["Diff-Maint",], kronmullerbarr07.2.nl["Diff-Break",])
 
-kronmullerbarr07.2.ld.exp <- calcPE(kronmullerbarr07.2.ld["S-M",], kronmullerbarr07.2.ld["S-B",],
-                                    kronmullerbarr07.2.ld["D-M",], kronmullerbarr07.2.ld["D-B",])
+kronmullerbarr07.2.ld.exp <- calcPE(kronmullerbarr07.2.ld["Same-Maint",], kronmullerbarr07.2.ld["Same-Break",],
+                                    kronmullerbarr07.2.ld["Diff-Maint",], kronmullerbarr07.2.ld["Diff-Break",])
   
 brownschmidt09.1a.exp <- calcPE(brownschmidt09.1a["Same-Maintain",], brownschmidt09.1a["Same-Break",],
                                 brownschmidt09.1a["Diff-Maintain",], brownschmidt09.1a["Diff-Break",])
