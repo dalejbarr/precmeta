@@ -5,3 +5,5 @@ Run the R scripts in this order:
 1. load_data.R
 2. preprocess.R
 3. partner_specificity.R
+
+For plotting, run the scripts allplots.R, alleffects.R, and spkrspec.R in any order
