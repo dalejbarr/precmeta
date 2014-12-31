@@ -1,0 +1,1089 @@
+# ######################################################
+# 
+# File created by Dale J. Barr 
+# contact: dale.barr at glasgow dot ac dot uk
+# 
+# This is a plain text file written to comply with the emacs org-mode
+# light markup style. It is best viewed using the emacs text editor.
+# 
+# The following software packages were used
+#
+# emacs version 24
+# emacs org-mode version 8.3beta
+# R version 3.1.1 with add-on packages:
+#   dplyr_0.3.0.90000
+#   tidyr_0.2.0
+#   magrittr_1.5
+#   ggplot2_1.0.0
+#
+# There are three "entry" points for reproducing the analysis.
+#
+# FIRST ENTRY POINT:
+# 
+# From scratch!  Start in the section entitled "Preprocessing".  To
+# make this work you will need to know how install and access data
+# from a mysql database.  This is necessary for Barr and Keysar (2002)
+# as well as Kronmuller and Barr (2007).  And, you will need to be
+# enough of a guru to know how to fix .sql files with mysql formatting
+# from 2005.  Here's are bash commands that will help you upgrade the
+# sql files to comply with newer mysql syntax (warning, typed from
+# memory)
+#
+#   sed -i.bak Grounding2.sql s/TYPE=/ENGINE=/g
+#   sed -i.bak Grounding2.sql 's/Condition/`Condition`/g'
+#   sed -i.bak Grounding2.sql s/timestamp/varchar/g
+#
+# SECOND ENTRY POINT:
+#
+# From the post-preprocessing stage.  Skip "Preprocessing" and
+# start with "Derive all the effects and bootstrap CIs."
+#
+# THIRD ENTRY POINT:
+#
+# Just create the plots.  Start at "Plot" heading.
+# 
+#+TITLE: Precedent Meta-Analysis Study
+#+AUTHOR: Edmundo Kronmüller and Dale J. Barr
+#+PROPERTY: header-args:R :noweb yes :session *R*
+
+* Preprocess
+
+** DONE Barr and Keysar 2002, Experiment 2
+	 CLOSED: [2014-12-29 Mon 19:22]
+
+*** Pull out data
+
+#+BEGIN_SRC R
+  library(dplyr)
+  library(tidyr)
+
+  con <- src_mysql("Grounding2", user=NULL, password=NULL)
+
+  subjects <- tbl(con, "Subject")
+
+  trial <- tbl(con, "Trial")
+
+  edat <- tbl(con, "Eye2aoiDC") %>% inner_join(subjects, by="SubjID") %>%
+      select(-Version) %>% collect()
+
+  # how many nontarget AOIs in each item? use as divisor in analysis
+  divisor <- edat %>% expand(ItemID, AOI) %>% as.data.frame() %>%
+      filter(AOI!="LOC", AOI!="TARG") %>% group_by(ItemID) %>%
+      summarize(divisor=n())
+
+  subjcond <- edat %>% select(-ms, -AOI) %>%
+      distinct() %>%
+      arrange(SubjID, ItemID)
+
+  edat_bin <- edat %>% 
+      mutate(bin=floor((ms+25)/50)*50,
+      aoi2=ifelse(AOI!="TARG" & AOI!="LOC" & AOI!="X", "other", AOI)) %>%
+      select(-AOI, -Who, -Grnd, -ms) %>%
+      group_by(SubjID, ItemID, bin, aoi2) %>%
+      summarize(Y=n()) %>% ungroup()
+
+  edat_bin2 <- edat_bin %>%
+      expand(SubjID, ItemID, bin, aoi2) %>%
+      left_join(edat_bin) %>%
+      mutate(Y=ifelse(is.na(Y), 0, Y))
+
+  edat_bin3 <- edat_bin2 %>% 
+      inner_join(subjcond, by=c("SubjID", "ItemID")) %>%
+      group_by(SubjID, Who, Grnd, bin, aoi2) %>%
+      summarize(Y=sum(Y)) %>% ungroup()
+
+  edat_bin4 <- edat_bin3 %>%
+      group_by(SubjID, Who, Grnd, bin) %>%
+      summarize(N=sum(Y)) %>%
+      inner_join(edat_bin3) %>%
+      mutate(p=ifelse(aoi2=="other", Y/(11*N), Y/N)) %>%
+      filter(aoi2=="TARG" | aoi2=="other") %>%
+      select(-Y, -N) %>% ungroup() %>% spread(aoi2, p) %>%
+      mutate(TAS=TARG-other) %>% select(-other, -TARG) %>%
+      mutate(Speaker=ifelse(Who=="c", "Same", "Diff"),
+             Grounded=Grnd=="y") %>%
+      select(-Who, -Grnd) %>% as.data.frame()
+
+  saveRDS(edat_bin4, file="BarrKeysar2002/Experiment2.rds")
+#+END_SRC
+
+*** Plot
+
+#+BEGIN_SRC R
+  library(dplyr)
+  library(ggplot2)
+
+  edat_bin4 <- readRDS("BarrKeysar2002/Experiment2.rds")
+
+  edat_plot <- edat_bin4 %>%
+      group_by(Speaker, Grounded, bin) %>%
+      summarize(mTAdv=mean(TAS))
+
+  ggplot(edat_plot, aes(x=bin, y=mTAdv, color=Speaker, shape=Grounded)) + geom_line() + geom_point()
+#+END_SRC
+
+
+** DONE Metzing & Brennan 2003
+	 CLOSED: [2014-12-29 Mon 19:26]
+
+#+BEGIN_SRC R
+  library(dplyr)
+  library(tidyr)
+  library(magrittr)
+  library(gdata)
+
+  dat <- read.xls("MetzingBrennan2003/B&H_TopiCS_intervals_by_subs.xls", sheet=1, header=TRUE)
+
+  # Some of the columns have '#NULL!' values in them, and are being
+  # treated as factors.  We need to convert them to numeric
+  coltypes <- dat %>%
+      select(-subject) %>%
+      sapply(is.numeric)
+
+  fixedcols <- dat %>%
+      select(-subject) %>%
+      extract(, !coltypes) %>%
+      lapply(function(x) {
+          as.numeric(gsub("#NULL!", NA_character_, as.character(x)))
+      })
+
+  dat[names(fixedcols)] <- fixedcols
+
+  # Ok, we've fixed the columns that were read incorrectly.
+  # Now we've got to deconstruct the columns into a tidy table.
+  dat %<>%
+      gather(key, measure, -subject) %>%
+      separate(key, into = c("window", "cond"), sep="\\.") %>%
+      separate(window, into = c("junk1", "win"), sep=4) %>%
+      separate(cond, into = c("iv1", "iv2"), sep=1) %>%
+      select(-junk1) %>%
+      mutate(Precedent=ifelse(iv2==1, "Maintain", "Break"),
+             Speaker=ifelse(iv1==1, "Same", "Diff"),
+             win=as.numeric(win),
+             bin=(win-1)*300) %>%
+      rename(SubjID=subject, TAS=measure) %>%
+      select(-iv1, -iv2, -win)
+
+  saveRDS(dat, file="MetzingBrennan2003/Experiment.rds")
+#+END_SRC
+
+** DONE Kronmuller & Barr 2007
+	 CLOSED: [2014-12-29 Mon 22:22]
+
+*** Experiment 1
+
+#+BEGIN_SRC R
+  library(dplyr)
+  library(tidyr)
+
+  con <- src_mysql("KB07_Experiment1", user=NULL, password=NULL)
+
+  fprob <- tbl(con, "_fProbSubj") %>%
+      arrange(SubjID, Cond, Identity, Bin) %>%
+      collect()
+
+  dat <- fprob %>% expand(SubjID, Cond, Bin, Identity) %>%
+      left_join(fprob) %>%
+      mutate(p=ifelse(is.na(p), 0, p)) %>%
+      spread(Identity, p) %>%
+      mutate(Speaker=ifelse(substr(Cond,1,1)=="D", "Diff", "Same"),
+             Precedent=ifelse(substr(Cond, 2, 2)=="N", "Break", "Maintain"),
+                 TAS=Target-(Mentioned/6+Unmentioned)/2) %>%
+      rename(bin=Bin) %>% filter(bin<=2000) %>%
+      select(SubjID, Speaker, Precedent, bin, TAS)
+
+  saveRDS(dat, file="KronmullerBarr2007/Experiment1.rds")
+
+  #### test by plotting
+
+  library(ggplot2)
+
+  ggplot(dat %>% group_by(Speaker, Precedent, bin) %>% 
+             summarize(mp=mean(TAS)),
+         aes(bin, mp, color=Speaker, shape=Precedent)) + geom_line() +
+             geom_point()
+#+END_SRC
+
+*** Experiment 2
+
+#+BEGIN_SRC R
+  library(dplyr)
+  library(tidyr)
+
+  con <- src_mysql("KB07_Experiment2", user=NULL, password=NULL)
+
+  fprob <- tbl(con, "_fProbSubj") %>%
+      arrange(SubjID, Cond, Identity, Bin) %>%
+      collect()
+
+  dat <- fprob %>% expand(SubjID, Cond, Bin, Identity) %>%
+      left_join(fprob) %>%
+      mutate(p=ifelse(is.na(p), 0, p)) %>%
+      spread(Identity, p) %>%
+      mutate(Speaker=ifelse(substr(Cond, 1, 1)=="D", "Diff", "Same"),
+             Precedent=ifelse(substr(Cond, 2, 2)=="N", "Break", "Maintain"),
+             Load=ifelse(substr(Cond, 3, 3)=="W", "Yes", "No"),
+                 TAS=Target-(Mentioned+Unmentioned)/2) %>%
+      rename(bin=Bin) %>% filter(bin<=2000) %>%
+      select(SubjID, Speaker, Precedent, Load, bin, TAS)
+
+  saveRDS(filter(dat, Load=="Yes") %>% select(-Load) %>% as.data.frame(),
+          file="KronmullerBarr2007/Experiment2_Load.rds")
+
+  saveRDS(filter(dat, Load=="No") %>% select(-Load) %>% as.data.frame(),
+          file="KronmullerBarr2007/Experiment2_NoLoad.rds")
+
+  ##############
+  # test by plotting
+
+  library(ggplot2)
+
+  ggplot(dat %>% group_by(Speaker, Precedent, Load, bin) %>% 
+             summarize(mp=mean(TAS)),
+         aes(bin, mp, color=Speaker, shape=Precedent)) + geom_line() +
+             geom_point() + facet_wrap(~Load)
+#+END_SRC
+
+
+** DONE Barr 2008
+	 CLOSED: [2014-12-29 Mon 23:01]
+
+#+BEGIN_SRC R
+  library(dplyr)
+  library(tidyr)
+
+  makeCumulativeToSelection <- function(x, maxms) {
+      # crop the data to maxms
+      x2 <- filter(x, bin<=maxms)
+      if (max(x2$bin<maxms)) {
+          dftail <- data.frame(RespID=x2$RespID[1],
+                               ms=round(seq(ifelse((max(x2$ms)+17)>maxms, maxms, max(x2$ms)+17),
+                                   maxms, 1000/60)),
+                               Identity="target", stringsAsFactors=FALSE)
+          dftail$bin <- floor((dftail$ms+25)/50)*50
+          res <- rbind(x2, dftail)
+      } else {
+          res <- x2
+      }
+      res
+  }
+
+  con <- src_mysql("LexComp4", user=NULL, password=NULL)
+
+  edat <- tbl(con, "_eye2aoi") %>% collect() %>%
+      mutate(bin=floor((ms+25)/50)*50) %>%
+      filter(ms<=2000) %>%
+      group_by(RespID) %>%
+      do(makeCumulativeToSelection(., 2000)) %>% ungroup()
+
+  resp <- tbl(con, "Response") %>%
+      inner_join(tbl(con, "Subject")) %>%
+      inner_join(tbl(con, "Session")) %>%
+      inner_join(tbl(con, "Trial")) %>%
+      inner_join(tbl(con, "Item")) %>%
+      inner_join(tbl(con, "Condition"), by=c("Cell"="CellID")) %>%
+      filter(Cell>0) %>% collect() %>%
+      mutate(RespID=as.integer(RespID),
+             Speaker=ifelse(substr(Value, 4, 4)=="s", "Same", "Diff")) %>%
+      select(SubjID, ItemCellID, Item, RespID, Speaker, Cond=Value)
+
+  dat.n <- edat %>% inner_join(select(resp, RespID, SubjID, Speaker)) %>%
+      group_by(SubjID, Speaker, bin) %>%
+      summarize(N=n())
+
+  dat.y <- edat %>% inner_join(select(resp, RespID, SubjID, Speaker)) %>%
+      expand(SubjID, Speaker, bin, Identity) %>%
+      left_join(edat %>% inner_join(select(resp, RespID, SubjID, Speaker)) %>%
+                    group_by(SubjID, Speaker, bin, Identity) %>%
+                    summarize(Y=n())) %>%
+      mutate(Y=ifelse(is.na(Y), 0, Y))
+
+  dat.p <- dat.y %>% inner_join(dat.n) %>%
+      mutate(p=Y/N) %>% select(-Y, -N) %>%
+      spread(Identity, p) %>%
+      mutate(TAS=target-(comparison+irrelevant)/2) %>%
+      select(SubjID, Speaker, bin, TAS)
+
+  saveRDS(dat.p, file="Barr2008/Experiment3.rds")
+
+  ### test with ggplot2
+  library(ggplot2)
+
+  ggplot(dat.p %>% group_by(Speaker, bin) %>% summarize(mTAdv=mean(TAS)),
+         aes(bin, mTAdv, color=Speaker)) + geom_line() + geom_point()
+#+END_SRC
+
+
+** DONE Brown-Schmidt 2009
+
+*** Experiment 1a
+
+#+BEGIN_SRC R
+  # This file loads in data received from Sarah Brown-Schmidt
+  # for Experiment 1 of her 2009 paper.
+  #
+  # Citation for the data:
+  #
+  # Brown-Schmidt, S. (2009).  Partner-specific interpretation of
+  # maintained referential precedents during interactive dialogue.
+  # /Journal of Memory and Language/, /61/, 171--190.
+
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+
+  # lookup table to rename regions to 'target' versus 'other'
+  reg.matchup <- data.frame(Looks=c("competitor","else","fill","target"),
+                            AOI=c("other","X","other","target"),
+                            stringsAsFactors=FALSE)
+
+  # load in the file
+  bs_exp1a <- read.csv(file="Brown-Schmidt2009/SBS09_1a_linux.csv", header=TRUE,
+                       stringsAsFactors=FALSE) %>%
+              mutate(bin=floor((Adjtime + 12)/24)*24,
+                     spkr=substr(condition,1,4),
+                     prec=ifelse(substr(condition,6,10)=="DiffN",
+                                 "Break","Maintain")) %>%
+              inner_join(reg.matchup) %>%
+              group_by(subjectID, bin, spkr, prec, AOI) %>%
+              summarize(Y=n()) %>%
+              filter(bin<1800)  # this last bin has missing vals
+
+  # fill in missing rows where there are zero looks
+  allbins <- bs_exp1a %>%
+      select(subjectID, bin, spkr, prec) %>%
+      distinct()
+
+  allaoi <- data_frame(AOI=unique(reg.matchup$AOI))
+
+  # create table with all possible combinations of
+  # subjects, prec, spkr, bin, and AOI
+  #
+  # the ones missing from bs_exp1a should be zeroes
+  allcomb <- merge(allbins, allaoi)
+
+  # put in these rows using a left join
+  # then calculate TAS for each subject/prec/spkr combination
+  bs09_e1 <- left_join(allcomb, bs_exp1a) %>%
+      mutate(Y=ifelse(is.na(Y), 0, Y)) %>%
+      arrange(subjectID, bin, spkr, prec, AOI) %>%
+      spread(AOI, Y) %>%
+      rename(SubjID=subjectID, Speaker=spkr, Precedent=prec) %>%
+      mutate(N=other+target+X,
+             TAS=(target/N)-(other/(9*N))) %>%
+      select(-other, -target, -X, -N) %>% as.data.frame()
+
+  saveRDS(bs09_e1, file="Brown-Schmidt2009/Experiment1a.rds")
+#+END_SRC
+
+#+RESULTS:
+
+**** bootstrap the figure
+
+#+BEGIN_SRC R
+  library(dplyr)
+  library(ggplot2)
+
+  bs09_e1 <- readRDS(file="Brown-Schmidt2009/bs09_e1.rds")
+
+  ggplot(
+      bs09_e1 %>%
+          group_by(bin, spkr, prec) %>%
+          summarize(mTAS=mean(TAS)) %>%
+          mutate(Speaker=spkr,
+                 Precedent=factor(prec, levels=c("Maintain","Break"))),
+      aes(bin, mTAS, color=Speaker)) +
+          geom_line(aes(linetype=Precedent)) +
+      geom_point()
+#+END_SRC
+
+
+*** Experiment 1b
+
+#+BEGIN_SRC R
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+
+  # lookup table to rename regions to 'target' versus 'other'
+  reg.matchup <- data.frame(Looks=c("competitor","else","fill","target"),
+                            AOI=c("other","X","other","target"),
+                            stringsAsFactors=FALSE)
+
+  # load in the file
+  bs_exp1b <- read.csv(file="Brown-Schmidt2009/SBS09_1b_linux.csv", header=TRUE,
+                       stringsAsFactors=FALSE) %>%
+              mutate(bin=floor((Adjtime + 12)/24)*24,
+                     spkr=substr(condition,1,4),
+                     prec=ifelse(substr(condition,6,10)=="DiffN",
+                                 "Break","Maintain")) %>%
+              inner_join(reg.matchup) %>%
+              group_by(subjectID, bin, spkr, prec, AOI) %>%
+              summarize(Y=n()) %>%
+              filter(bin<1800)  # this last bin has missing vals
+
+  # fill in missing rows where there are zero looks
+  allbins <- bs_exp1b %>%
+      select(subjectID, bin, spkr, prec) %>%
+      distinct()
+
+  allaoi <- data_frame(AOI=unique(reg.matchup$AOI))
+
+  # create table with all possible combinations of
+  # subjects, prec, spkr, bin, and AOI
+  #
+  # the ones missing from bs_exp1a should be zeroes
+  allcomb <- merge(allbins, allaoi)
+
+  # put in these rows using a left join
+  # then calculate TAS for each subject/prec/spkr combination
+  bs09_e1b <- left_join(allcomb, bs_exp1b) %>%
+      mutate(Y=ifelse(is.na(Y), 0, Y)) %>%
+      arrange(subjectID, bin, spkr, prec, AOI) %>%
+      spread(AOI, Y) %>%
+      rename(SubjID=subjectID, Speaker=spkr, Precedent=prec) %>%
+      mutate(N=other+target+X,
+             TAS=(target/N)-(other/(9*N))) %>%
+      select(-other, -target, -X, -N) %>% as.data.frame()
+
+  missing_frames <- data_frame(SubjID=rep(31,4),
+                               bin=c(936, 960, 984, 1008),
+                               Speaker=rep("Diff", 4),
+                               Precedent=rep("Break", 4),
+                               TAS=rep(NA_real_, 4))
+
+  bs09_e1b %<>% rbind(missing_frames) %>% arrange(SubjID, Speaker, Precedent, bin)
+
+  saveRDS(bs09_e1b, file="Brown-Schmidt2009/Experiment1b.rds")
+
+  # just test by plotting
+
+  binned <- bs09_e1b %>% group_by(Speaker, Precedent, bin) %>%
+      summarize(mTAdv=mean(TAS, na.rm=TRUE))
+
+  library(ggplot2)
+  ggplot(binned, aes(x=bin, y=mTAdv, color=Speaker, shape=Precedent)) +
+      geom_line() + geom_point()
+#+END_SRC
+
+
+*** Experiment 2
+
+#+BEGIN_SRC R
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+
+  reg.matchup <- data.frame(Looks=c("comp","nothing","other1","other2","target"),
+                            AOI=c("other","X","other","other","target"),
+                            stringsAsFactors=FALSE)
+
+  # load in the file
+  bs_exp2 <- read.csv(file="Brown-Schmidt2009/SBS09_2_linux.csv", header=TRUE,
+                       stringsAsFactors=FALSE) %>%
+              mutate(bin=floor((Adjtime + 16)/32)*32,
+                     Speaker=factor(ifelse(substr(condition,1,2)=="DP","Diff","Same"),
+                         levels=c("Same","Diff")),
+                     Precedent=factor(ifelse(substr(condition,3,4)=="DN","Break","Maintain"))) %>%
+                         select(-condition) %>%
+              rename(SubjID=subjectID) %>% 
+              inner_join(reg.matchup) %>%
+              group_by(SubjID, bin, Speaker, Precedent, AOI) %>%
+              summarize(Y=n()) %>%
+              filter(bin<1800)  # this last bin has missing vals
+
+  # fill in missing rows where there are zero looks
+  allbins <- bs_exp2 %>%
+      select(SubjID, bin, Speaker, Precedent) %>%
+      distinct()
+
+  allaoi <- data_frame(AOI=unique(reg.matchup$AOI))
+
+  # create table with all possible combinations of
+  # subjects, prec, spkr, bin, and AOI
+  #
+  # the ones missing from bs_exp1a should be zeroes
+  allcomb <- merge(allbins, allaoi)
+
+  # put in these rows using a left join
+  # then calculate TAS for each subject/prec/spkr combination
+  bs09_e2 <- left_join(allcomb, bs_exp2) %>%
+      mutate(Y=ifelse(is.na(Y), 0, Y)) %>%
+      arrange(SubjID, bin, Speaker, Precedent, AOI) %>%
+      spread(AOI, Y) %>%
+      mutate(N=other+target+X,
+             TAS=(target/N)-(other/(3*N))) %>%
+      select(-other, -target, -X, -N) %>% as.data.frame()
+
+  saveRDS(bs09_e2, file="Brown-Schmidt2009/Experiment2.rds")
+
+  #####################
+
+  # check by plotting
+
+  library(ggplot2)
+  ggplot(bs09_e2 %>% group_by(Speaker, Precedent, bin) %>%
+             summarize(mTAdv=mean(TAS)),
+         aes(bin, mTAdv, color=Speaker, shape=Precedent)) +
+         geom_line() + geom_point()
+#+END_SRC
+
+
+** DONE Horton & Slaten 2012
+
+#+BEGIN_SRC R
+  library(dplyr)
+
+  hs12 <- read.csv(file="HortonSlaten2012/hs12.csv") %>%
+      mutate(bin2=(BIN>0)*(BIN-1)+(BIN<0)*BIN, TAS=TargProp-CompProp,
+             Speaker=factor(ifelse(PARTNER=="same", "Same", "Diff")),
+             Mapping=factor(MAPPING), bin=bin2*100,
+             SubjID=as.integer(substr(SUBJID,2,3))) %>%
+          filter(CONTRAST=="test", Mapping=="Between") %>%
+          select(SubjID, bin, Speaker, TAS) %>% as.data.frame()
+               
+  saveRDS(hs12, file="HortonSlaten2012/Experiment.rds")
+
+  ##################
+  # test by plotting
+
+  library(ggplot2)
+  ggplot(hs12 %>% group_by(Speaker, bin) %>% summarize(mTAdv=mean(TAS)),
+         aes(x=bin, y=mTAdv, color=Speaker)) + geom_line() + geom_point()
+#+END_SRC
+
+
+
+
+
+* Derive all of the effects and bootstrap CIs
+
+** Combine all the data
+
+#+BEGIN_SRC R :tangle 01_derive_effects.R
+  library(dplyr)
+  library(magrittr)
+
+  loaddata <- function(x) {
+      readRDS(x$Filename)
+  }
+
+  explist <- data_frame(Experiment=c("Barr & Keysar (2002), Experiment 2",
+                 "Metzing & Brennan (2003)",
+                 "Kronmüller & Barr (2007), Experiment 1",
+                 "Kronmüller & Barr (2007), Experiment 2 (No Load)",
+                 "Kronmüller & Barr (2007), Experiment 2 (Load)",
+                 "Barr (2008), Experiment 3",
+                 "Brown-Schmidt (2009), Experiment 1a",
+                 "Brown-Schmidt (2009), Experiment 1b",
+                 "Brown-Schmidt (2009), Experiment 2",
+                 "Horton & Slaten (2012)"),
+             Name=c("BK02", "MB03", "KB07-1", "KB07-2NL", "KB07-2L",
+                 "B08", "BS09-1a", "BS09-1b", "BS09-2", "HS12"),
+             Filename=c("BarrKeysar2002/Experiment2.rds",
+                 "MetzingBrennan2003/Experiment.rds",
+                 "KronmullerBarr2007/Experiment1.rds",
+                 "KronmullerBarr2007/Experiment2_NoLoad.rds",
+                 "KronmullerBarr2007/Experiment2_Load.rds",
+                 "Barr2008/Experiment3.rds",
+                 "Brown-Schmidt2009/Experiment1a.rds",
+                 "Brown-Schmidt2009/Experiment1b.rds",
+                 "Brown-Schmidt2009/Experiment2.rds",
+                 "HortonSlaten2012/Experiment.rds"),
+             MainEff=c(rep(TRUE, 5), FALSE, rep(TRUE, 3), FALSE),
+             Maintained=rep(TRUE, 10),
+             Broken=c(FALSE, rep(TRUE, 4), FALSE, rep(TRUE, 3), FALSE))
+
+  # make all the studies start at zero and end at 1500 ms
+  dat <- explist %>% group_by(Name) %>% do(loaddata(.)) %>% ungroup() %>%
+      arrange(Name, SubjID, Speaker, Precedent, bin)
+  binend <- dat %>% group_by(Name, Speaker, Precedent) %>%
+      summarize(maxbin=max(bin)) %>% ungroup() %>%
+      summarize(maxbin=min(maxbin)) %>% extract2("maxbin")
+  dat %<>% filter(bin<=binend, bin>=0)
+
+  saveRDS(explist, file="list_of_all_experiments.rds")
+  saveRDS(dat, file="collected_data.rds")
+#+END_SRC
+
+#+RESULTS:
+
+
+*** Regularize
+
+- make sure same number of bins for each subject per condition
+
+#+BEGIN_SRC R :exports results :results value :colnames yes
+  library(dplyr)
+
+  dat <- readRDS("collected_data.rds")
+
+  dat.nby <- dat %>% group_by(Name, SubjID, Speaker, Precedent) %>%
+      summarize(nbins=n())
+
+  dat.nby %>% group_by(Name, nbins) %>%
+      summarize(nsubj=n())
+#+END_SRC
+
+#+RESULTS:
+| Name     | nbins | nsubj |
+|----------+-------+-------|
+| B08      |    31 |    72 |
+| BK02     |    62 |    72 |
+| BS09-1a  |    63 |   192 |
+| BS09-1b  |    63 |   192 |
+| BS09-2   |    47 |   128 |
+| HS12     |    16 |    32 |
+| KB07-1   |    16 |   208 |
+| KB07-2L  |    31 |   224 |
+| KB07-2NL |    31 |   224 |
+| MB03     |     6 |    84 |
+
+
+** Bootstrap
+
+*** Load packages and data
+
+#+name: setup
+#+BEGIN_SRC R :exports none :results none
+  library(dplyr)
+  library(magrittr)
+  library(tidyr)
+
+  explist <- readRDS("list_of_all_experiments.rds")
+  dat <- readRDS("collected_data.rds")
+  subjlist <- dat %>%
+      select(Name, SubjID) %>% distinct() %>% group_by(Name)
+#+END_SRC
+
+*** Functions
+
+#+name: fns
+#+BEGIN_SRC R :results none
+  aggUp <- function(x, full=FALSE) {
+      ff <- x %>% group_by(Name, Speaker, Precedent, bin) %>%
+          summarize(mTAS=mean(TAS, na.rm=TRUE)) %>% ungroup()
+      if (full) {
+          return(ff)
+      } else {
+          return(ff$mTAS)
+      }
+  }
+
+  aggUpEffect <- function(x, full=FALSE) {
+      ff <- x %>% group_by(Name, bin, EffectName) %>%
+          summarize(Effect=mean(Effect, na.rm=TRUE))
+      if (full) {
+          return(ff)
+      } else {
+          return(ff$Effect)
+      }
+  }
+
+  extractMainEffect <- function(x) {
+      bk02 <- filter(x, Name=="BK02")
+      restdat <- filter(x, Name!="BK02")
+      restdat %<>% group_by(Name, SubjID, bin, Precedent) %>%
+          summarize(TAS=mean(TAS, na.rm=TRUE)) %>%
+          ungroup() %>% spread(Precedent, TAS) %>%
+          mutate(EffectName="Main Effect of Precedent", Effect=Maintain-Break) %>%
+          select(-Break, -Maintain)
+      bk02 %<>% group_by(Name, SubjID, bin, Precedent=Grounded) %>%
+          summarize(TAS=mean(TAS, na.rm=TRUE)) %>%
+          ungroup() %>% spread(Precedent, TAS) %>%
+          mutate(EffectName="Main Effect of Precedent", Effect=`TRUE`-`FALSE`) %>%
+          select(-`TRUE`, -`FALSE`)
+      rbind(restdat, bk02) %>% arrange(Name, SubjID, bin)
+  }
+
+  bootOnce <- function(dat, slist) {
+      sampleSubjects <- function(x) {
+          x$OldSubjID <- x$SubjID
+          x$SubjID <- sample(x$OldSubjID, length(x$OldSubjID), replace=TRUE)
+          return(x)
+      }
+      bdat <- slist %>% do(sampleSubjects(.)) %>% ungroup() %>%
+          inner_join(dat, by=c("Name","SubjID")) %>%
+          select(-SubjID) %>% rename(SubjID=OldSubjID)
+      return(bdat)
+  }
+
+  extractSpeakerEffect <- function(x, effname) {
+      x %>% spread(Speaker, TAS) %>%
+          mutate(EffectName=effname,
+                 Effect=Same-Diff) %>% select(-Diff, -Same)
+  }
+
+  interpolate <- function(x) {    
+      binseq <- seq(0, 1500, 50)
+      allbins <- data_frame(Name=rep(x$Name[1], length(binseq)),
+                 bin=binseq)
+
+      x %>% rename(oldbin=bin) %>% inner_join(allbins, by="Name") %>%
+          filter(oldbin<=bin) %>% group_by(Name, bin) %>%
+          summarize(bPrev=max(oldbin)) %>%
+          right_join(x %>% rename(oldbin=bin), by="Name") %>%
+          filter(oldbin>bin) %>% group_by(Name, bin, bPrev) %>%
+          summarize(bNext=min(oldbin)) %>% ungroup() %>%
+          inner_join(select(x, bin, Effect), by=c("bPrev"="bin")) %>%
+          rename(ePrev=Effect) %>%
+          inner_join(select(x, bin, Calc, EffectName, Effect), by=c("bNext"="bin")) %>%
+          rename(eNext=Effect) %>%
+          mutate(dist=(bin-bPrev)/(bNext-bPrev),
+                 Effect=ePrev+dist*(eNext-ePrev)) %>%
+          select(Calc, Name, bin, EffectName, Effect) %>% ungroup()
+  }
+
+  interpolateAndAggregate <- function(x, full=FALSE) {
+      ff <- x %>%
+          group_by(Calc) %>%
+          do(aggUpEffect(., TRUE)) %>%
+          group_by(Calc, Name) %>%
+          do(interpolate(.)) %>%
+          group_by(Calc, bin, EffectName) %>%
+          summarize(Effect=mean(Effect, na.rm=TRUE)) %>% ungroup()
+      if (full) {
+          return(ff)
+      } else {
+          return(extract2(ff, "Effect"))
+      }
+  }
+
+  baselineCorrect <- function(x) {
+    x %>% filter(bin<200) %>%
+      group_by(Name, SubjID, EffectName) %>%
+      summarize(baseline=mean(Effect)) %>%
+      ungroup() %>% 
+      inner_join(x) %>%
+      mutate(Effect=Effect-baseline, Calc="Overall Baseline Corrected") %>%
+      select(Name, SubjID, bin, EffectName, Effect, Calc)
+  }
+#+END_SRC
+
+*** Bootstrap Main Effect
+
+**** Experiment Means
+
+#+BEGIN_SRC R :tangle 02_boot_main_effect.R
+  <<setup>>
+
+  <<fns>>
+
+  medata <- dat %>% inner_join(explist, by="Name") %>%
+      filter(MainEff) %>% select(-(Experiment:Broken))
+
+  memeans <- extractMainEffect(medata) %>% aggUpEffect(., TRUE)
+  boot.mx <- replicate(10000, bootOnce(medata, subjlist) %>%
+                           extractMainEffect() %>% aggUpEffect())
+  boot.ci <- apply(boot.mx, 1, quantile, probs=c(.025, .975), na.rm=TRUE)
+  memeans$pMin <- boot.ci["2.5%",]
+  memeans$pMax <- boot.ci["97.5%",]
+  saveRDS(memeans, file="memeans.rds")
+#+END_SRC
+
+**** Overall Means
+
+#+BEGIN_SRC R :tangle 05_boot_main_effect_overall.R
+  <<setup>>
+
+  <<fns>>
+  
+  # main effect
+  medata <- dat %>% inner_join(explist, by="Name") %>%
+      filter(MainEff) %>% select(-(Experiment:Broken))
+
+  memeans_raw <- extractMainEffect(medata) %>%
+      mutate(Calc="Overall Raw")
+
+  # apply baseline correction
+  memeans_all <- memeans_raw %>%
+      rbind(baselineCorrect(memeans_raw))
+
+  # sample subjects
+  memeans_overall <- memeans_all %>% interpolateAndAggregate(TRUE)
+
+  # note: this kept crashing when the number of replications was set to 10000
+  boot.mx <- replicate(10000, bootOnce(memeans_all, subjlist) %>%
+      interpolateAndAggregate(FALSE))
+  boot.ci <- apply(boot.mx, 1, quantile, probs=c(.025, .975), na.rm=TRUE)
+  memeans_overall$pMin <- boot.ci["2.5%",]
+  memeans_overall$pMax <- boot.ci["97.5%",]
+
+  saveRDS(memeans_overall, file="memeans_overall.rds")
+
+  ### test out
+
+  # library(ggplot2)
+  # ggplot(memeans_overall, aes(bin, Effect, color=Calc)) +
+  #     geom_line() + geom_ribbon(aes(ymin=pMin, ymax=pMax, fill=Calc), alpha=.1, color=NA) +
+  #     geom_point()
+#+END_SRC
+
+
+*** Bootstrap Same Speaker Advantage for Maintained Precedents
+
+**** Experiment Means
+
+#+BEGIN_SRC R :tangle 03_boot_ssmp.R
+  <<setup>>
+
+  <<fns>>
+
+  effname <- "Same Speaker Advantage for Maintained Precedents"
+  ssdata <- dat %>% inner_join(filter(explist, Maintained), by="Name") %>%
+      filter(ifelse(is.na(Grounded), TRUE, Grounded),
+             ifelse(is.na(Precedent), TRUE, Precedent=="Maintain")) %>%
+      select(-(Grounded:Broken))
+
+  ssmeans <- extractSpeakerEffect(ssdata, effname) %>% aggUpEffect(., TRUE)
+  boot.mx <- replicate(10000, bootOnce(ssdata, subjlist) %>%
+                           extractSpeakerEffect(., effname) %>% aggUpEffect())
+  boot.ci <- apply(boot.mx, 1, quantile, probs=c(.025, .975), na.rm=TRUE)
+  ssmeans$pMin <- boot.ci["2.5%",]
+  ssmeans$pMax <- boot.ci["97.5%",]
+
+  saveRDS(ssmeans, file="ssmeans.rds")
+#+END_SRC
+
+**** Overall Means
+
+#+BEGIN_SRC R :tangle 06_boot_ssmp_overall.R
+  <<setup>>
+
+  <<fns>>
+
+  effname <- "Same Speaker Advantage for Maintained Precedents"
+  ssdata <- dat %>% inner_join(filter(explist, Maintained), by="Name") %>%
+      filter(ifelse(is.na(Grounded), TRUE, Grounded),
+             ifelse(is.na(Precedent), TRUE, Precedent=="Maintain")) %>%
+      select(-(Grounded:Broken))
+
+  ssdata_raw <- extractSpeakerEffect(ssdata, effname) %>% mutate(Calc="Overall Raw")
+
+  # apply baseline correction
+  ssdata_all <- ssdata_raw %>%
+      rbind(baselineCorrect(ssdata_raw))
+
+  ssmeans_overall <- ssdata_all %>% interpolateAndAggregate(TRUE)
+
+  boot.mx <- replicate(10000, bootOnce(ssdata_all, subjlist) %>%
+      interpolateAndAggregate(FALSE))
+  boot.ci <- apply(boot.mx, 1, quantile, probs=c(.025, .975), na.rm=TRUE)
+  ssmeans_overall$pMin <- boot.ci["2.5%",]
+  ssmeans_overall$pMax <- boot.ci["97.5%",]
+
+  saveRDS(ssmeans_overall, file="ssmeans_overall.rds")
+
+  ### test out
+
+  # library(ggplot2)
+  # ggplot(ssmeans_overall, aes(bin, Effect, color=Calc)) +
+  #     geom_line() + geom_ribbon(aes(ymin=pMin, ymax=pMax, fill=Calc), alpha=.1, color=NA) +
+  #     geom_point()
+#+END_SRC
+
+*** Bootstrap Different Speaker Advantage for Broken Precedents
+
+**** Experiment Means
+
+#+BEGIN_SRC R :tangle 04_boot_dsbp.R
+  <<setup>>
+
+  <<fns>>
+
+  effname <- "Different Speaker Advantage for Broken Precedents"
+  dsdata <- dat %>% inner_join(filter(explist, Broken), by="Name") %>%
+      filter(Precedent=="Break") %>% select(-(Grounded:Broken))
+
+  dsmeans <- extractSpeakerEffect(dsdata, effname) %>%
+      mutate(Effect=-Effect) %>%
+      aggUpEffect(., TRUE)
+  boot.mx <- replicate(10000,
+                       bootOnce(dsdata, subjlist) %>%
+                       extractSpeakerEffect(., effname) %>%
+                       mutate(Effect=-Effect) %>%
+                       aggUpEffect())
+  boot.ci <- apply(boot.mx, 1, quantile, probs=c(.025, .975), na.rm=TRUE)
+  dsmeans$pMin <- boot.ci["2.5%",]
+  dsmeans$pMax <- boot.ci["97.5%",]
+
+  saveRDS(dsmeans, file="dsmeans.rds")
+#+END_SRC
+
+**** Overall Means
+
+#+BEGIN_SRC R :tangle 07_boot_dsbp_overall.R
+  <<setup>>
+
+  <<fns>>
+
+  effname <- "Different Speaker Advantage for Broken Precedents"
+  dsdata <- dat %>% inner_join(filter(explist, Broken), by="Name") %>%
+      filter(Precedent=="Break") %>% select(-(Grounded:Broken))
+
+  dsdata_raw <- extractSpeakerEffect(dsdata, effname) %>%
+      mutate(Effect=-Effect, Calc="Overall Raw")
+
+  # apply baseline correction
+  dsdata_all <- dsdata_raw %>%
+      rbind(baselineCorrect(dsdata_raw))
+
+  dsmeans_overall <- dsdata_all %>% interpolateAndAggregate(TRUE)
+
+  boot.mx <- replicate(10000, bootOnce(dsdata_all, subjlist) %>%
+      interpolateAndAggregate(FALSE))
+  boot.ci <- apply(boot.mx, 1, quantile, probs=c(.025, .975), na.rm=TRUE)
+  dsmeans_overall$pMin <- boot.ci["2.5%",]
+  dsmeans_overall$pMax <- boot.ci["97.5%",]
+
+  saveRDS(dsmeans_overall, file="dsmeans_overall.rds")
+  ### test out
+
+  # library(ggplot2)
+  # ggplot(dsmeans_overall, aes(bin, Effect, color=Calc)) +
+  #     geom_line() + geom_ribbon(aes(ymin=pMin, ymax=pMax, fill=Calc), alpha=.1, color=NA) +
+  #     geom_point()
+#+END_SRC
+
+*** Partner specificity index
+
+ #+BEGIN_SRC R :tangle 08_boot_psi_index.R
+   <<setup>>
+
+   <<fns>>
+
+   dat2 <- dat %>%
+       inner_join(select(explist, Name, Experiment, Broken)) %>%
+       filter(Broken | Name=="BK02") %>%
+       mutate(Precedent=ifelse(is.na(Precedent),
+									ifelse(Grounded, "Maintain", "Break"),
+									Precedent),
+							Cond=paste0(Precedent, "_", Speaker)) %>%
+       select(-Precedent, -Speaker, -Grounded, -Experiment, -Broken) %>%
+       spread(Cond, TAS) %>%
+       mutate(xsame=Maintain_Same-Break_Same,
+							xdiff=Maintain_Diff-Break_Diff,
+							zsame=ifelse(xsame<=0, 0, xsame),
+							zdiff=ifelse(xdiff<=0, 0, xdiff),
+							zdiff2=ifelse(zdiff>zsame, zsame, zdiff), # don't allow X_diff > X_same
+							Effect=ifelse(zsame==0 & zdiff2==0, NA,
+									(2 * zsame) / (zsame + zdiff2) - 1),
+							EffectName="Partner-Specificity Ratio") %>%
+       select(Name, SubjID, bin, EffectName, Effect)
+
+   psoverall <- dat2 %>% aggUpEffect(TRUE) %>% mutate(Calc=Name) %>%
+       group_by(Name) %>% do(interpolate(.)) %>% select(-Calc) %>%
+       group_by(bin, EffectName) %>% summarize(Effect=mean(Effect, na.rm=TRUE)) %>%
+       ungroup()
+
+   boot.mx <- replicate(10000, bootOnce(dat2, subjlist) %>% aggUpEffect(TRUE) %>%
+       mutate(Calc=Name) %>% group_by(Name) %>% do(interpolate(.)) %>%
+       group_by(bin, EffectName) %>%
+       summarize(Effect=mean(Effect, na.rm=TRUE)) %>% extract2("Effect"))
+   boot.ci <- apply(boot.mx, 1, quantile, na.rm=TRUE, probs=c(.025, .975))
+
+   psoverall$pMin <- boot.ci["2.5%",]
+   psoverall$pMax <- boot.ci["97.5%",]
+
+   saveRDS(psoverall, file="psoverall.rds")
+ #+END_SRC
+
+ #+RESULTS:
+ [[file:psi.pdf]]
+
+
+
+* Plot
+
+** Experiment means with overall effects
+
+#+BEGIN_SRC R :exports results :results output graphics :file alleffects.pdf :width 12 :height 7
+  <<setup>>
+
+  ssmeans <- readRDS("ssmeans.rds")
+  memeans <- readRDS("memeans.rds")
+  dsmeans <- readRDS("dsmeans.rds")
+
+  ssmeans_overall <- readRDS("ssmeans_overall.rds")
+  memeans_overall <- readRDS("memeans_overall.rds")
+  dsmeans_overall <- readRDS("dsmeans_overall.rds")
+
+  # bring frames together and make compatible
+  expmeans <- rbind_list(ssmeans, memeans, dsmeans) %>%
+      inner_join(select(explist, Name, Experiment)) %>%
+      select(-Name)
+  means_overall <- rbind_list(ssmeans_overall,
+                              memeans_overall, dsmeans_overall) %>%
+      filter(Calc=="Overall Baseline Corrected") %>%
+      rename(Experiment=Calc)
+
+  alldata <- rbind(expmeans, means_overall)
+
+  expnames <- alldata %>% select(Experiment) %>% distinct() %>% extract2("Experiment")
+
+  library(ggplot2)
+  ggplot(alldata,
+         aes(bin, Effect, color=Experiment, shape=Experiment)) + geom_point(alpha=.7) +
+         geom_line() +
+         geom_ribbon(aes(ymin=pMin, ymax=pMax, fill=Experiment), color=NA) +
+         facet_wrap(~EffectName, nrow=2, scales="free_x") +
+         scale_shape_manual(values=c(1:nrow(explist), NA),
+                            labels=expnames) +
+         scale_color_manual(values=c(hcl(h=seq(15, 375, length=length(expnames)), l=65,
+                                c=100, alpha=.1)[1:(length(expnames)-1)], "#000000AA"),
+                            labels=expnames) +
+         scale_fill_manual(values=c(hcl(h=seq(15, 375, length=length(expnames)), l=65,
+                                c=100, alpha=.05)[1:(length(expnames)-1)], "#00000033"),
+                            labels=expnames) +
+         coord_cartesian(ylim=c(-.2, .5)) +
+         theme(legend.position=c(.75,.25))
+#+END_SRC
+
+#+RESULTS:
+[[file:alleffects.pdf]]
+
+** Relative effect sizes
+
+#+BEGIN_SRC R :exports results :results output graphics :file releff.pdf :width 10 :height 5
+  <<setup>>
+
+  ssmeans_overall <- readRDS("ssmeans_overall.rds")
+  memeans_overall <- readRDS("memeans_overall.rds")
+  dsmeans_overall <- readRDS("dsmeans_overall.rds")
+
+  # bring frames together and make compatible
+  means_overall <- rbind_list(ssmeans_overall,
+                              memeans_overall, dsmeans_overall) %>%
+      filter(Calc=="Overall Baseline Corrected") %>%
+      rename(`Effect Name`=EffectName)
+
+  library(ggplot2)
+  ggplot(means_overall,
+         aes(bin, Effect, color=`Effect Name`, shape=`Effect Name`)) + geom_point() +
+         geom_line() +
+         geom_ribbon(aes(ymin=pMin, ymax=pMax, fill=`Effect Name`), color=NA, alpha=.2) +
+         theme(legend.position=c(.22, .85))
+#+END_SRC
+
+#+RESULTS:
+[[file:releff.pdf]]
+
+** Partner-specificity index
+
+- 2*X_same / (X_same + X_diff), where X_i is the simple effect of Precedent at level i of speaker
+
+#+BEGIN_SRC R :exports results :results output graphics :file psi.pdf :width 10 :height 3
+  library(dplyr) 
+
+  psoverall <- readRDS(file="psoverall.rds")
+
+  library(ggplot2)
+  ggplot(psoverall, aes(bin, Effect, ymin=pMin, ymax=pMax)) +
+      geom_line() + geom_point() +
+      geom_ribbon(color=NA, alpha=.5) +
+      coord_cartesian(ylim=c(0,1))
+#+END_SRC
+
+#+RESULTS:
+[[file:psi.pdf]]
+
