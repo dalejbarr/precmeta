@@ -1,50 +1,52 @@
-# ######################################################
-# 
-# File created by Dale J. Barr 
-# contact: dale.barr at glasgow dot ac dot uk
-# 
-# This is a plain text file written to comply with the emacs org-mode
-# light markup style. It is best viewed using the emacs text editor.
-# 
-# The following software packages were used
-#
-# emacs version 24
-# emacs org-mode version 8.3beta
-# R version 3.1.1 with add-on packages:
-#   dplyr_0.3.0.90000
-#   tidyr_0.2.0
-#   magrittr_1.5
-#   ggplot2_1.0.0
-#
-# There are three "entry" points for reproducing the analysis.
-#
-# FIRST ENTRY POINT:
-# 
-# From scratch!  Start in the section entitled "Preprocessing".  To
-# make this work you will need to know how install and access data
-# from a mysql database.  This is necessary for Barr and Keysar (2002)
-# as well as Kronmuller and Barr (2007).  And, you will need to be
-# enough of a guru to know how to fix .sql files with mysql formatting
-# from 2005.  Here's are bash commands that will help you upgrade the
-# sql files to comply with newer mysql syntax (warning, typed from
-# memory)
-#
-#   sed -i.bak Grounding2.sql s/TYPE=/ENGINE=/g
-#   sed -i.bak Grounding2.sql 's/Condition/`Condition`/g'
-#   sed -i.bak Grounding2.sql s/timestamp/varchar/g
-#
-# SECOND ENTRY POINT:
-#
-# From the post-preprocessing stage.  Skip "Preprocessing" and
-# start with "Derive all the effects and bootstrap CIs."
-#
-# THIRD ENTRY POINT:
-#
-# Just create the plots.  Start at "Plot" heading.
-# 
 #+TITLE: Precedent Meta-Analysis Study
 #+AUTHOR: Edmundo Kronmüller and Dale J. Barr
 #+PROPERTY: header-args:R :noweb yes :session *R*
+
+* Background
+
+File created by Dale J. Barr 
+contact: dale.barr at glasgow dot ac dot uk
+ 
+This is a plain text file written to comply with the emacs org-mode
+light markup style. It is best viewed using the emacs text editor.
+
+The following software packages were used
+
+- emacs version 24
+- emacs org-mode version 8.3beta
+- R version 3.1.1 with add-on packages:
+  - dplyr_0.3.0.90000
+  - tidyr_0.2.0
+  - magrittr_1.5
+  - ggplot2_1.0.0
+
+** There are three "entry" points for reproducing the analysis.
+
+1. FIRST ENTRY POINT:
+
+From scratch!  Start in the section entitled "Preprocessing".  To
+make this work you will need to know how install and access data
+from a mysql database.  This is necessary for Barr and Keysar (2002)
+as well as Kronmuller and Barr (2007).  And, you will need to be
+enough of a guru to know how to fix .sql files with mysql formatting
+from 2005.  Here's are bash commands that will help you upgrade the
+sql files to comply with newer mysql syntax (warning, typed from
+memory)
+
+#+begin_example
+  sed -i.bak Grounding2.sql s/TYPE=/ENGINE=/g
+  sed -i.bak Grounding2.sql 's/Condition/`Condition`/g'
+  sed -i.bak Grounding2.sql s/timestamp/varchar/g
+#+end_example
+
+2. [@2] SECOND ENTRY POINT:
+
+From the post-preprocessing stage.  Skip "Preprocessing" and
+start with "Derive all the effects and bootstrap CIs."
+
+3. [@3] THIRD ENTRY POINT:
+
+Just create the plots.  Start at "Plot" heading.
 
 * Preprocess
 
@@ -384,7 +386,7 @@
   library(dplyr)
   library(ggplot2)
 
-  bs09_e1 <- readRDS(file="Brown-Schmidt2009/bs09_e1.rds")
+  bs09_e1 <- readRDS(file="Brown-Schmidt2009/Experiment1a.rds")
 
   ggplot(
       bs09_e1 %>%
