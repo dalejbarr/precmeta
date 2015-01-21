@@ -1,4 +1,4 @@
-READ ME
+[this file is from Sarah Brown-Schmidt]
 
 Please see the following paper for details:
 Brown-Schmidt, S. (2009). Partner-specific interpretation of maintained referential precedents during interactive dialog. Journal of Memory and Language, 61, 171-190.
