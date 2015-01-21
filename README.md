@@ -3,7 +3,7 @@
 
 This repository contains the scripts and raw data corresponding to the following manuscript:
 
-Kronmüller, E., & Barr, D. J. (under review).  Referential precedents in spoken language comprehension: A review and meta-analysis.  Manuscript under review.  Draft version, December 31, 2014.  Retrieved from [https://github.com/dalejbarr/precmeta](../master/docs/precmeta_dist.pdf?raw=true).
+> Kronmüller, E., & Barr, D. J. (under review).  Referential precedents in spoken language comprehension: A review and meta-analysis.  Manuscript under review.  Draft version, December 31, 2014.  Retrieved from [https://github.com/dalejbarr/precmeta](../master/docs/precmeta_dist.pdf?raw=true).
 
 The current version of the manuscript is [precmeta_dist.pdf](../master/docs/precmeta_dist.pdf?raw=true), and the LaTeX source files are in the [docs](../master/docs) subdirectory.
 
