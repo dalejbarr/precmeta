@@ -993,7 +993,7 @@ Just create the plots.  Start at "Plot" section.
 
 ** Experiment means with overall effects
 
-#+BEGIN_SRC R :exports results :results output graphics :file docs/alleffects.pdf :width 12 :height 7
+#+BEGIN_SRC R :exports both :results output graphics :file docs/alleffects.pdf :width 12 :height 7
   <<setup>>
 
   ssmeans <- readRDS("ssmeans.rds")
@@ -1040,7 +1040,7 @@ Just create the plots.  Start at "Plot" section.
 
 ** Relative effect sizes
 
-#+BEGIN_SRC R :exports results :results output graphics :file docs/releff.pdf :width 10 :height 5
+#+BEGIN_SRC R :exports both :results output graphics :file docs/releff.pdf :width 10 :height 5
   <<setup>>
 
   ssmeans_overall <- readRDS("ssmeans_overall.rds")
@@ -1068,7 +1068,7 @@ Just create the plots.  Start at "Plot" section.
 
 - 2*X_same / (X_same + X_diff), where X_i is the simple effect of Precedent at level i of speaker
 
-#+BEGIN_SRC R :exports results :results output graphics :file docs/psi.pdf :width 10 :height 3
+#+BEGIN_SRC R :exports both :results output graphics :file docs/psi.pdf :width 10 :height 3
   library(dplyr) 
 
   psoverall <- readRDS(file="psoverall.rds")
