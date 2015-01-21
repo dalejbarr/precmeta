@@ -614,7 +614,7 @@ Just create the plots.  Start at "Plot" section.
   If there is only one line in the resulting table for each
   experiment, then the test succeeded.
 
-#+BEGIN_SRC R :exports results :results value :colnames yes
+#+BEGIN_SRC R :exports both :results value :colnames yes
   library(dplyr)
 
   dat <- readRDS("collected_data.rds")
