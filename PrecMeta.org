@@ -22,7 +22,7 @@ The following software packages were used
 
 ** Reproducing the analysis
 
-Currently, the datasets in this repository include the full original data for work by the authors, and can be found in the subdirectories =Barr2008=, =BarrKeysar2002=, and =KronmullerBarr2007=.  Data from other authors will be included in the repository once permissions have been obtained.  Currently, the data from Brown-Schmidt (2009) is available as a zip archive on the author's website: http://sarahbrownschmidt.com/storage/examplesanddata/SBS09JMLsharing.zip.  Until all relevant permissions have been obtained it is only possible to reproduce the plots (third "entry point" below).
+Currently, the datasets in this repository include the full original data for work by the authors, and can be found in the subdirectories =Barr2008=, =BarrKeysar2002=, and =KronmullerBarr2007=.  Data from other authors will be included in the repository once permissions have been obtained.  Until all relevant permissions have been obtained it is only possible to reproduce the plots (third "entry point" below).
 
 /There are three "entry points" for reproducing the analysis./
 
