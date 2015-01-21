@@ -37,4 +37,4 @@ Horton, W. S., & Slaten, D. G. (2012). [Anticipating who will say what: The infl
 
 Kronmüller, E., & Barr, D. J. (2007). [Perspective-free pragmatics: Broken precedents and the recovery-from-preemption hypothesis](http://dx.doi.org/10.1016/j.jml.2006.05.002). *Journal of Memory and Language, 56*, 436-455.
 
-Metzing, C., & Brennan, S. E. (2003). [When conceptual pacts are broken: Partner-specific effects on the comprehension of referring expressions][http://dx.doi.org/10.1016/S0749-596X(03)00028-7]. *Journal of Memory and Language, 49*, 201-213.
+Metzing, C., & Brennan, S. E. (2003). <a href="http://dx.doi.org/10.1016/S0749-596X(03)00028-7">When conceptual pacts are broken: Partner-specific effects on the comprehension of referring expressions</a>. *Journal of Memory and Language, 49*, 201-213.
