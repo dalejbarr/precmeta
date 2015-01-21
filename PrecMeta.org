@@ -26,7 +26,7 @@ Currently, the datasets in this repository include the full original data for wo
 
 /There are three "entry points" for reproducing the analysis./
 
-1. FIRST ENTRY POINT:
+FIRST ENTRY POINT:
 
 From scratch!  Start in the section entitled "Preprocessing".  To
 make this work you will need to know how install and access data
@@ -43,12 +43,12 @@ memory)
   sed -i.bak Grounding2.sql s/timestamp/varchar/g
 #+end_example
 
-2. SECOND ENTRY POINT:
+SECOND ENTRY POINT:
 
 From the post-preprocessing stage.  Skip the "Preprocessing" section below and
 start with "Derive all the effects and bootstrap CIs."
 
-3. THIRD ENTRY POINT:
+THIRD ENTRY POINT:
 
 Just create the plots.  Start at "Plot" section.
 
@@ -380,17 +380,9 @@ Just create the plots.  Start at "Plot" section.
       select(-other, -target, -X, -N) %>% as.data.frame()
 
   saveRDS(bs09_e1, file="Brown-Schmidt2009/Experiment1a.rds")
-#+END_SRC
 
-#+RESULTS:
-
-**** bootstrap the figure
-
-#+BEGIN_SRC R
-  library(dplyr)
+  # just check on the results by plotting
   library(ggplot2)
-
-  bs09_e1 <- readRDS(file="Brown-Schmidt2009/Experiment1a.rds")
 
   ggplot(
       bs09_e1 %>%
@@ -402,7 +394,6 @@ Just create the plots.  Start at "Plot" section.
           geom_line(aes(linetype=Precedent)) +
       geom_point()
 #+END_SRC
-
 
 *** Experiment 1b
 
@@ -617,7 +608,11 @@ Just create the plots.  Start at "Plot" section.
 
 *** Regularize
 
-- make sure same number of bins for each subject per condition
+- Make sure same number of bins for each subject per condition, so
+  that the resulting matrix is the same size for each bootstrap epoch.
+  To test whether that is the case, we aggregate the number of bins.
+  If there is only one line in the resulting table for each
+  experiment, then the test succeeded.
 
 #+BEGIN_SRC R :exports results :results value :colnames yes
   library(dplyr)
@@ -644,7 +639,6 @@ Just create the plots.  Start at "Plot" section.
 | KB07-2L  |    31 |   224 |
 | KB07-2NL |    31 |   224 |
 | MB03     |     6 |    84 |
-
 
 ** Bootstrap
 
