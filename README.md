@@ -10,7 +10,7 @@ The current version of the manuscript is [precmeta_dist.pdf](../master/docs/prec
 We reanalyzed data from the 10 experiments in the table below.  The raw data appear in the subdirectories organized by the names of the authors.  Data will be added as permissions are obtained.
 
 |Source|Experiment| 
-|--|--|:-:|
+|--|:-:|
 |Barr & Keysar (2002) | 2 |
 |Metzing & Brennan (2003)|1 |
 |Kronmüller & Barr (2007) | 1 |
