@@ -20,7 +20,11 @@ The following software packages were used
   - magrittr_1.5
   - ggplot2_1.0.0
 
-** There are three "entry" points for reproducing the analysis.
+** Reproducing the analysis
+
+Currently, the datasets in this repository include the full original data for work by the authors, and can be found in the subdirectories =Barr2008=, =BarrKeysar2002=, and =KronmullerBarr2007=.  Data from other authors will be included in the repository once permissions have been obtained.  Currently, the data from Brown-Schmidt (2009) is available as a zip archive on the author's website: http://sarahbrownschmidt.com/storage/examplesanddata/SBS09JMLsharing.zip.  Until all relevant permissions have been obtained it is only possible to reproduce the plots (third "entry point" below).
+
+/There are three "entry points" for reproducing the analysis./
 
 1. FIRST ENTRY POINT:
 
@@ -39,14 +43,14 @@ memory)
   sed -i.bak Grounding2.sql s/timestamp/varchar/g
 #+end_example
 
-2. [@2] SECOND ENTRY POINT:
+2. SECOND ENTRY POINT:
 
-From the post-preprocessing stage.  Skip "Preprocessing" and
+From the post-preprocessing stage.  Skip the "Preprocessing" section below and
 start with "Derive all the effects and bootstrap CIs."
 
-3. [@3] THIRD ENTRY POINT:
+3. THIRD ENTRY POINT:
 
-Just create the plots.  Start at "Plot" heading.
+Just create the plots.  Start at "Plot" section.
 
 * Preprocess
 
@@ -949,7 +953,7 @@ Just create the plots.  Start at "Plot" heading.
 
 *** Partner specificity index
 
- #+BEGIN_SRC R :tangle 08_boot_psi_index.R
+#+BEGIN_SRC R :tangle 08_boot_psi_index.R
    <<setup>>
 
    <<fns>>
@@ -988,18 +992,14 @@ Just create the plots.  Start at "Plot" heading.
    psoverall$pMax <- boot.ci["97.5%",]
 
    saveRDS(psoverall, file="psoverall.rds")
- #+END_SRC
-
- #+RESULTS:
- [[file:psi.pdf]]
-
+#+END_SRC
 
 
 * Plot
 
 ** Experiment means with overall effects
 
-#+BEGIN_SRC R :exports results :results output graphics :file alleffects.pdf :width 12 :height 7
+#+BEGIN_SRC R :exports results :results output graphics :file docs/alleffects.pdf :width 12 :height 7
   <<setup>>
 
   ssmeans <- readRDS("ssmeans.rds")
@@ -1042,11 +1042,11 @@ Just create the plots.  Start at "Plot" heading.
 #+END_SRC
 
 #+RESULTS:
-[[file:alleffects.pdf]]
+[[file:docs/alleffects.pdf]]
 
 ** Relative effect sizes
 
-#+BEGIN_SRC R :exports results :results output graphics :file releff.pdf :width 10 :height 5
+#+BEGIN_SRC R :exports results :results output graphics :file docs/releff.pdf :width 10 :height 5
   <<setup>>
 
   ssmeans_overall <- readRDS("ssmeans_overall.rds")
@@ -1068,13 +1068,13 @@ Just create the plots.  Start at "Plot" heading.
 #+END_SRC
 
 #+RESULTS:
-[[file:releff.pdf]]
+[[file:docs/releff.pdf]]
 
 ** Partner-specificity index
 
 - 2*X_same / (X_same + X_diff), where X_i is the simple effect of Precedent at level i of speaker
 
-#+BEGIN_SRC R :exports results :results output graphics :file psi.pdf :width 10 :height 3
+#+BEGIN_SRC R :exports results :results output graphics :file docs/psi.pdf :width 10 :height 3
   library(dplyr) 
 
   psoverall <- readRDS(file="psoverall.rds")
@@ -1087,5 +1087,5 @@ Just create the plots.  Start at "Plot" heading.
 #+END_SRC
 
 #+RESULTS:
-[[file:psi.pdf]]
+[[file:docs/psi.pdf]]
 
