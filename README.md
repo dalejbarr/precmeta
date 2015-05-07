@@ -3,9 +3,9 @@
 
 This repository contains the scripts and raw data corresponding to the following manuscript:
 
-> Kronmüller, E., & Barr, D. J. (under review).  Referential precedents in spoken language comprehension: A review and meta-analysis.  Manuscript under review.  Draft version, December 31, 2014.  Retrieved from [https://github.com/dalejbarr/precmeta](../master/docs/precmeta_dist.pdf?raw=true).
+> Kronmüller, E., & Barr, D. J. (2015).  Referential precedents in spoken language comprehension: A review and meta-analysis. _Journal of Memory and Language_, _83_, 1–19.
 
-The current version of the manuscript is [precmeta_dist.pdf](../master/docs/precmeta_dist.pdf?raw=true), and the LaTeX source files are in the [docs](../master/docs) subdirectory.
+A preprint version of the manuscript is [precmeta_dist.pdf](../master/docs/precmeta_dist.pdf?raw=true), and the LaTeX source files are in the [docs](../master/docs) subdirectory.
 
 We reanalyzed data from ten visual-world eyetracking experiments reported in six published articles:
 
@@ -20,7 +20,7 @@ We reanalyzed data from ten visual-world eyetracking experiments reported in six
 - Brown-Schmidt (2009), Experiment 2
 - Horton and Slaten (2012), Experiment 1
 
-The raw data appear in the subdirectories organized by author names.  Data will be added to the public repository as permissions are obtained.
+The raw data appear in the subdirectories organized by author names.  Data will be added to the public repository if/when permissions are obtained (repository currently contains 9/10 datasets).
 
 The analysis scripts were written in R, and are embedded in the file [PrecMeta.org](../master/PrecMeta.org), which is an [emacs org-mode](http://orgmode.org) light markup document.  This document can be opened as plain text with any text editor, but is best viewed either through github or in the [emacs](http://www.gnu.org/software/emacs) text editor, which provide syntax highlighting.  The R scripts make heavy use of the [dplyr](https://github.com/hadley/dplyr) and [magrittr](https://github.com/smbache/magrittr) add-on packages for R.
 
