@@ -34,13 +34,12 @@ from a mysql database.  This is necessary for Barr and Keysar (2002)
 as well as Kronmuller and Barr (2007).  And, you will need to be
 enough of a guru to know how to fix .sql files with mysql formatting
 from 2005.  Here's are bash commands that will help you upgrade the
-sql files to comply with newer mysql syntax (warning, typed from
-memory)
+sql files to comply with newer mysql syntax.
 
 #+begin_example
-  sed -i.bak Grounding2.sql s/TYPE=/ENGINE=/g
-  sed -i.bak Grounding2.sql 's/Condition/`Condition`/g'
-  sed -i.bak Grounding2.sql s/timestamp/varchar/g
+  sed -i.bak s/TYPE=/ENGINE=/g Grounding2.sql 
+  sed -i.bak 's/Condition/`Condition`/g' Grounding2.sql
+  sed -i.bak s/timestamp/varchar/g Grounding2.sql 
 #+end_example
 
 *** SECOND ENTRY POINT:
